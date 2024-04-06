@@ -5,9 +5,15 @@
 
 
 #%%
+
+# Imported for call handling
 import requests
 
+# Imported for dump 
 import json
+
+# Imported for sleep function to avoid throttling
+import time
 
 # %%
 
@@ -25,18 +31,21 @@ def callURL(url):
     auth = {'Authorization': 'Token bcfdf1aa2c38d3f738a9276fd9c2bd51abfaed3f'}
 
     # Make the request
-    response = requests.get(url)
+    response = requests.get(url, headers = auth)
 
     # Check to see if the response was successful
     head = requests.head(url)
     if response.status_code == 200:
-        
-        # If yes, return 'results' (25 filings, excluding metadata)
+
+        # If yes, note the URL and return 'results' (25 filings, excluding metadata)
+        print("Obtained results from URL: ", url)
         return response.json()['results']
+    
     else:
 
         # If no, print an error message and return a blank list
         print("Failed to fetch data. Status code: ", response.status_code)
+        print("Failed URL: ", url)
         return []
     
 # %%
@@ -59,7 +68,7 @@ class apiCall:
 
         # Create a filename for later use in saving output
         self.filename = year + "_" + quarter + ".json"
-        self.pages = 2 # pageRound(requests.get(self.url).json()['count'])
+        self.pages = pageRound(requests.get(self.url).json()['count'])
 
     def pagCall(self):
         raw_data = []
@@ -67,6 +76,7 @@ class apiCall:
             page_url = self.url + "&page=" + str(page)
             data = callURL(page_url)
             raw_data.append(data)
+            time.sleep(1)
         return raw_data
     
     
