@@ -5,6 +5,10 @@
 
 #%%
 
+'''
+Imports
+'''
+
 # Imported for call handling
 import requests
 
@@ -13,6 +17,10 @@ import json
 
 
 # %%
+
+'''
+Open and load raw json file with user-input filepath
+'''
 
 # Asks user to specify local drive filepath for unzipped json file since it was too large to process through the repository itself
 filepath = input("Specify unzipped filepath: ")
@@ -25,26 +33,9 @@ data
 
 # %%
 
-# Specify a list of unnecessary fields to remove later
-removeList = [
-    'url', 
-    'filing_uuid', 
-    'filing_type', 
-    'filing_period_display', 
-    'filing_document_url',
-    'filing_document_content_type',
-    'expenses_method',
-    'posted_by_name',
-    'termination_date',
-    'registrant_address_1',
-    'registrant_address_2',
-    'registrant_different_address',
-    'registrant_city',
-    'registrant_state',
-    'registrant_zip',
-    'conviction_disclosures',
-    'foreign_entities'
-]
+'''
+Set up processes to clean data
+'''
 
 # Define a check for display text to see if the item is actually a quarterly filings report (or an amendment to one)
 def typeCheck(display_text):
@@ -116,6 +107,10 @@ def trimDict(oldDict):
     # Initialize a new dictionary that will be used to accept the trimmed fields and ultimately replace the old dictionary
     newDict = {}
 
+    # Add dictionary key/value pairs that don't require nesting
+    newDict['income'] = oldDict['income']
+    newDict['expenses'] = oldDict['expenses']
+
     # For each "top-level" dictionary key, present as a key in the 'trimChoices' dictionary defined earlier:
     for key1 in trimChoices:
 
@@ -132,6 +127,12 @@ def trimDict(oldDict):
     newDict['lobbying_activities'] = trimLobbyingList(oldDict['lobbying_activities'])
 
     return newDict
+
+# %%
+
+'''
+Loop through each listed dictionary, then clean and append it to a new list if it is the desired filing type
+'''
 
 # Define an empty list to contain the cleaned/trimmed data
 clean_data = []
@@ -152,8 +153,8 @@ for page in data:
         if typeCheck(dict['filing_type_display']) == True:
 
             # Delete keys that were specified earlier in the list for removal
-            for keyR in removeList:
-                del dict[keyR]
+            # for keyR in removeList:
+            #     del dict[keyR]
 
             # Apply the 'trimDict' function to the dictionary
             dict = trimDict(dict)
@@ -165,6 +166,12 @@ for page in data:
         else:
             pass
     print(f"Cleaned page: {count}")
+
+# %%
+
+'''
+Save the cleaned data
+'''
 
 # Specify a file name to save the cleaned data
 filename = 'cleaned_LDA_filings.json'
