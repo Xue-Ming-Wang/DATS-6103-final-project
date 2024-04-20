@@ -23,7 +23,7 @@ import pandas as pd
 # %%
 # Load data from raw file in repository
 
-with open("cleaned_LDA_filings.json") as file:
+with open("cleaned_LDA_filings_v2.json") as file:
 
     data = json.load(file)
 
@@ -68,12 +68,23 @@ for record in data:
     # Define an empty list to fill out (will ultimately be appended to datalist)
     recordList = []
 
-    # Append easily available fields
-    recordList.append(record['income'])
-    recordList.append(record['expenses'])
+    # Append a field for income or expenses, depending on which one is available (the nature of filings means that one or the other will be present but not both)
+    if record['income'] != None:
+        recordList.append(record['income'])
+    else:
+        recordList.append(record['expenses'])
+
+    # If the type was expenses, mark True for internal lobbying
+    if record['expenses'] != None:
+        recordList.append(1)
+    else:
+        recordList.append(0)
 
     # Initialize an empty list for government entities
     recordEntitiesList = []
+    
+    # Initialize an empty list for lobbyists
+    recordLobbyistsList = []
 
     # For each issue that could show up:
     for issue in issuesList:
@@ -90,17 +101,24 @@ for record in data:
             # Add any entitity IDs found to our entities list
             recordEntitiesList.append(activity['government_entities'])
 
+            # Add any lobbyists found to our lobbyists list
+            recordLobbyistsList.append(activity['lobbyists'])
+
         # If the issue was found among the record's activities, append True to the recordList, otherwise append False
         if issueCheck == True:
-            recordList.append(True)
+            recordList.append(1)
         else:
-            recordList.append(False)
+            recordList.append(0)
 
     # Convert the recordEntitiesList, which is now filled with nested entitity lists from all activity disclosures, to a 1-D list
     recordEntitiesConcat = list(itertools.chain.from_iterable(recordEntitiesList))
 
+    # Conver the recordLobbyistsList, which is now filled with nested lobbyist lists from all activity disclosures, to a 1-D list
+    recordLobbyistsConcat = list(itertools.chain.from_iterable(recordLobbyistsList))
+
     # Initialize a list for unique entities
     recordEntitiesUnique = []
+
     # For each "raw" entity, check to see if it is already present in the unique list before including it
     for recordEntityRaw in recordEntitiesConcat:
         if recordEntityRaw not in recordEntitiesUnique:
@@ -120,9 +138,32 @@ for record in data:
         
         # If the enitity was found among the record's activities, append True to the recordList, otherwise append False
         if entityCheck == True:
-            recordList.append(True)
+            recordList.append(1)
         else:
-            recordList.append(False)
+            recordList.append(0)
+    
+    # Initialize a list for unique lobbyists
+    recordLobbyistsUnique = []
+
+    # For each "raw" lobbyist, check to see if they are already present in the unique list before including them
+    for recordLobbyistRaw in recordLobbyistsConcat:
+        if recordLobbyistRaw not in recordLobbyistsUnique:
+            recordLobbyistsUnique.append(recordLobbyistRaw)
+    
+    # Append a count for all unique lobbyists
+    recordList.append(len(recordLobbyistsUnique))
+
+    # Initialize a list for new lobbyists only
+    recordLobbyistsNew = []
+    # For each lobbyist in the unique lobbyist list:
+    for recordLobbyistRaw in recordLobbyistsUnique:
+        # If they are new, add them to the new lobbyist list
+        if recordLobbyistRaw['new'] == True:
+            recordLobbyistsNew.append(recordLobbyistRaw['new'])
+    
+    # Append a count for all new, unique lobbyists
+    recordList.append(len(recordLobbyistsNew))
+
 
     # Add the full recordList to the dataList
     dataList.append(recordList)
@@ -133,9 +174,10 @@ for record in data:
 colNameList = []
 
 # Append column name values in the order that they were added earlier
-colNameList.append(['income', 'expenses'])
+colNameList.append(['income or expenses', 'internal lobbying'])
 colNameList.append(issuesList)
 colNameList.append(entitiesNameList)
+colNameList.append(['lobbyist_count_all', 'lobbyist_count_new'])
 
 # Convert to a 1-D list
 colNameList = list(itertools.chain.from_iterable(colNameList))
@@ -146,4 +188,6 @@ colNameList = list(itertools.chain.from_iterable(colNameList))
 df = pd.DataFrame(dataList, columns = colNameList)
 
 print(df)
+
+
 # %%
