@@ -80,16 +80,22 @@ def trimLobbyingList(activityList):
         # Add the issue code display field from the old dictionary
         newDict['general_issue_code_display'] = activity['general_issue_code_display']
 
-        # Add a count of all listed lobbyists for the activity
-        newDict['lobbyist_count_all'] = len(activity['lobbyists'])
+        # Define an empty list to add lobbyist information to
+        cleanedLobbyists = []
 
-        # Initialize a count for new lobbyists only; then, loop through the old lobbyist list to increment the count each time a new lobbyist is found
-        newDict['lobbyist_count_new'] = 0
-        for item in activity['lobbyists']:
-            if item['new'] == True:
-                newDict['lobbyist_count_new'] += 1
-            else:
-                pass
+        # For each lobbyist assigned to the activity in question:
+        for person in activity['lobbyists']:
+            # Create an empty dictionary
+            lobbyistDict = {}
+            # Define/add dictionary fields for lobbyist ID and whether or not they are new
+            lobbyistDict['id'] = person['lobbyist']['id']
+            lobbyistDict['new'] = person['new']
+            # Append the stripped-down dictionary to the lobbyist list
+            cleanedLobbyists.append(lobbyistDict)
+
+        # Add the full cleaned lobbyist list to newDict
+        newDict['lobbyists'] = cleanedLobbyists
+
         # Initialize a list of government entities, and append the 'id' fields for each government entity from the old listed dictionaries
         newDict['government_entities'] = []
         for entity in activity['government_entities']:
@@ -174,7 +180,7 @@ Save the cleaned data
 '''
 
 # Specify a file name to save the cleaned data
-filename = 'cleaned_LDA_filings.json'
+filename = 'cleaned_LDA_filings_v2.json'
 
 # Save the cleaned data to this file
 with open(filename, "a") as source:
