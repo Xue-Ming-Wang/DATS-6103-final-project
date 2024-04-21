@@ -22,6 +22,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Importing scikitlearn for modeling and feature selection work
+import sklearn
+
+# Importing numpy for modeling work
+import numpy as np
 
 # %%
 # Load data from raw file in repository
@@ -213,6 +218,10 @@ for col in df.columns.tolist():
 print(df)
 
 # %%
+# Drop internal lobbying due to focus on policy areas
+df = df.drop(columns = ['internal lobbying'])
+
+# %%
 
 # Initializing list of column sums to identify useful targets for visuals
 sumList = []
@@ -248,45 +257,183 @@ sns.heatmap(corrMatrix, ax = None)
 plt.title("Correlation matrix for all features")
 plt.show()
 
-
 # %%
-# Correlation printouts
-
-print(corrMatrix)
-
-
-# %%
-# Delete highly correlated variables based on which one has the highest incidence frequency
-
-# Define list of variables to leave out (outcome options)
+# Define a list of variables for outcomes and split the dataset
 yList = ['income or expenses', 'lobbyist_count_all', 'lobbyist_count_new']
+
+ # %%
+# Split the dataset into X and Y
+
+Y = df.loc[:, yList]
+X = df.drop(columns = yList)
+
+print(Y)
+print(X)
+
+xCols = X.columns
+
+# %%
+# Gather feature importances
+
+# Import mutual_info_regression; mutual_info_classif fails for continuous target variables
+from sklearn.feature_selection import mutual_info_regression
+
+# Calculate importances for all 3 potential target variables
+
+importances_1 = mutual_info_regression(X, Y['income or expenses'])
+
+importances_2 = mutual_info_regression(X, Y['lobbyist_count_all'])
+
+importances_3 = mutual_info_regression(X, Y['lobbyist_count_new'])
+
+feat_importances_1 = pd.Series(importances_1, xCols)
+
+feat_importances_2 = pd.Series(importances_2, xCols)
+
+feat_importances_3 = pd.Series(importances_3, xCols)
+
+plt.figure(figsize = (40,25))
+
+feat_importances_1.plot(kind = 'barh', color = 'purple')
+feat_importances_1.plot(kind = 'barh', color = 'blue')
+feat_importances_1.plot(kind = 'barh', color = 'green')
+
+plt.show()
+
+# %%
+# Generate a list of average importances
+
+# Initialize an empty list
+avgImportances = {}
+
+# For each column in the input variable dataframe:
+for col in xCols.tolist():
+    # Calculate the average of all importances
+    avg = (feat_importances_1[col] + feat_importances_2[col] + feat_importances_2[col])/3
+    # Add average importance to the dictionary, using the name as the key
+    avgImportances[col] = avg
+
+print(f"Average Importances: {avgImportances}")
+     
+# %% 
+# Remove columns with no feature importance related to any potential output
+for col in xCols.tolist():
+    if avgImportances[col] == 0:
+        X.drop(columns = [col], inplace = True)
+        print(f"Dropping {col} due to zero feature importance")
+
+# %%
+
+# Mark highly correlated input variables based on which one has the highest average importance
 
 # Initialize a list of column names for the dataframe to drop after checking correlations
 dropList = []
 
 # For each column in the dataframe:
-for col1 in df.columns.tolist():
+for col1 in X.columns.tolist():
     # For each column in the dataframe (again):
-    for col2 in df.columns.tolist():
+    for col2 in X.columns.tolist():
         # Get the correlation between these from the matrix defined earlier
         corr = corrMatrix[col1][col2]
 
         # If the correlation is past 0.3, the columns aren't the same, and neither is in the exclusion list:
-        if corr > 0.3 and col1 != col2 and col1 not in yList and col2 not in yList:
+        if corr > 0.3 and col1 != col2:
             # Print the combination out
             print(f"High correlation: {col1} and {col2} ({corr})")
 
             # Add the column that has a lower sum in the dataset (less occurrences) to the drop list
-            if df[col1].sum() > df[col2].sum():
-                print(f"Dropping {col2}")
+            if avgImportances[col1] > avgImportances[col2]:
+                print(f"Dropping {col2} due to lower feature importance")
                 dropList.append(col2)
             else:
-                print(f"Dropping {col1}")
+                print(f"Dropping {col1} due to power feature importance")
                 dropList.append(col1)
 
+# %%
+
 # Drop columns that present multicollinearity concerns using the list generated in the previous loops
-df.drop(columns = dropList, inplace = True)
- # %%
+X.drop(columns = dropList, inplace = True)
+
+# %%
+# Plot elbow for k-means clustering
+
+# Note: Lecture 10 notes; using 'auto' for n_init since the best parameters for this high-dimensional dataset aren't immediately obvious
+
+from sklearn.cluster import KMeans
+
+wcss = []
+for i in range(1, 50):
+    kmeans = KMeans(n_clusters = i, init = 'k-means++', max_iter = 300, n_init = 'auto', random_state = 0)
+    kmeans.fit(X)
+    wcss.append(kmeans.inertia_)
+plt.plot(range(1, 50), wcss)
+plt.title('Elbow Method')
+plt.xlabel('Number of clusters')
+plt.ylabel('WCSS')
+plt.show()
+
+# %%
+# Print cluster differences and select an outcome
+for i in range(1, len(wcss)):
+    print(f"{i-1} to {i}: {wcss[i] - wcss[i-1]}")
+
+print('The "elbow" seems to be vaguely present at 19')
+
+nChosen = 19
+
+# %%
+# Construct k-means model
+
+kmeans = KMeans(n_clusters = nChosen, init = 'k-means++', max_iter = 300, n_init = 'auto', random_state = 0)
+
+y_kmeans = kmeans.fit_predict(X)
 
 
+# %%
+# Graph clusters relative to outcome variables to see if visible relationships exist
+
+Y_kMeans = Y.copy()
+
+Y_kMeans['cluster'] = y_kmeans.tolist()
+
+pct99 = np.percentile(Y_kMeans['income or expenses'],99)
+
+sns.scatterplot(data = Y_kMeans, x = 'income or expenses', y = 'lobbyist_count_all', hue = 'cluster')
+plt.xlim(0, pct99)
+plt.title(f"Filing amounts and total unique lobbyists by k-means cluster\n(Up to 99th percentile filing amounts)")
+plt.show()
+
+# %%
+# Group and visualize outcomes by cluster
+
+clusterGroup = Y_kMeans.groupby('cluster')
+
+clusterAvg = clusterGroup.mean()
+
+clusterAvg = clusterAvg.reset_index()
+
+for y in yList:
+    sns.barplot(data = clusterAvg, x = 'cluster', y = y, palette = 'pastel')
+    plt.title(f"{y} by k-means cluster")
+    plt.show()
+
+# %%
+# Visualize cluster 4 categories
+
+X_kMeans = X.copy()
+
+X_kMeans['cluster'] = y_kmeans.tolist()
+
+for cNum in [4,11]:
+
+    X_kMeansFilter = X_kMeans[X_kMeans['cluster'] == cNum].mean().sort_values(ascending = True)
+
+    X_kMeansFilter = X_kMeansFilter[X_kMeansFilter > 0.5]
+
+    X_kMeansFilter.drop('cluster', inplace = True)
+
+    plt.figure(figsize = (10,7))
+    X_kMeansFilter.plot(kind = 'barh', title = f'Top entity and topic focuses for cluster {cNum}')
+    plt.xlim(0, 1)
+    plt.show()
 # %%
