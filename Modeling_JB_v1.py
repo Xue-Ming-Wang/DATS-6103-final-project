@@ -25,8 +25,6 @@ import seaborn as sns
 # Importing scikitlearn for modeling and feature selection work
 import sklearn
 
-# Importing numpy for modeling work
-import numpy as np
 
 # %%
 # Load data from raw file in repository
@@ -206,12 +204,18 @@ print(df)
 df = df[df['income or expenses'] != 0]
 
 # %%
-# Drop columns with very low incidence rates
+# Define a list of variables for outcomes to use throughout the script
+
+yList = ['income or expenses', 'lobbyist_count_all', 'lobbyist_count_new']
+
+
+# %%
+# Drop columns with very low  or near-ubiquitous incidence rates
 
 for col in df.columns.tolist():
     zeroRows = len(df[df[col]==0])
     zeroPct = zeroRows/len(df)
-    if zeroPct > 0.99:
+    if (zeroPct > 0.99 or zeroPct < 0.01) and col not in yList:
         df.drop(columns=col, inplace = True)
         print(f"Dropping {col}; occurrence %: {1 - (zeroRows/len(df)):.2f}")
 
@@ -257,10 +261,6 @@ sns.heatmap(corrMatrix, ax = None)
 plt.title("Correlation matrix for all features")
 plt.show()
 
-# %%
-# Define a list of variables for outcomes and split the dataset
-yList = ['income or expenses', 'lobbyist_count_all', 'lobbyist_count_new']
-
  # %%
 # Split the dataset into X and Y
 
@@ -278,6 +278,7 @@ xCols = X.columns
 # Import mutual_info_regression; mutual_info_classif fails for continuous target variables
 from sklearn.feature_selection import mutual_info_regression
 
+# %%
 # Calculate importances for all 3 potential target variables
 
 importances_1 = mutual_info_regression(X, Y['income or expenses'])
@@ -291,6 +292,8 @@ feat_importances_1 = pd.Series(importances_1, xCols)
 feat_importances_2 = pd.Series(importances_2, xCols)
 
 feat_importances_3 = pd.Series(importances_3, xCols)
+
+# Plot importances (not super legible but just for reference)
 
 plt.figure(figsize = (40,25))
 
@@ -317,8 +320,12 @@ print(f"Average Importances: {avgImportances}")
      
 # %% 
 # Remove columns with no feature importance related to any potential output
+
+# For each input column:
 for col in xCols.tolist():
+    # If the average importance is zero:
     if avgImportances[col] == 0:
+        # Drop it
         X.drop(columns = [col], inplace = True)
         print(f"Dropping {col} due to zero feature importance")
 
@@ -354,16 +361,22 @@ for col1 in X.columns.tolist():
 # Drop columns that present multicollinearity concerns using the list generated in the previous loops
 X.drop(columns = dropList, inplace = True)
 
+
+
 # %%
+# K-means clustering (skipped due to high result variance)
+
+'''
 # Plot elbow for k-means clustering
 
 # Note: Lecture 10 notes; using 'auto' for n_init since the best parameters for this high-dimensional dataset aren't immediately obvious
+
 
 from sklearn.cluster import KMeans
 
 wcss = []
 for i in range(1, 50):
-    kmeans = KMeans(n_clusters = i, init = 'k-means++', max_iter = 300, n_init = 'auto', random_state = 0)
+    kmeans = KMeans(n_clusters = i, init = 'k-means++', max_iter = 1000, n_init = 10, random_state = 0)
     kmeans.fit(X)
     wcss.append(kmeans.inertia_)
 plt.plot(range(1, 50), wcss)
@@ -372,24 +385,29 @@ plt.xlabel('Number of clusters')
 plt.ylabel('WCSS')
 plt.show()
 
-# %%
+
+# # %%
 # Print cluster differences and select an outcome
 for i in range(1, len(wcss)):
     print(f"{i-1} to {i}: {wcss[i] - wcss[i-1]}")
 
-print('The "elbow" seems to be vaguely present at 19')
+print('The "elbow" seems to be vaguely present at 2 across multiple runs')
 
-nChosen = 19
 
-# %%
+# Setting chosen cluster number as well as a random seed so that results stay consistent across runs
+nChosen = 29
+
+np.random.seed(77)
+
+# # %%
 # Construct k-means model
 
-kmeans = KMeans(n_clusters = nChosen, init = 'k-means++', max_iter = 300, n_init = 'auto', random_state = 0)
+kmeans = KMeans(n_clusters = nChosen, init = 'k-means++', max_iter = 1000, n_init = 10, random_state = 0)
 
 y_kmeans = kmeans.fit_predict(X)
 
 
-# %%
+# # %%
 # Graph clusters relative to outcome variables to see if visible relationships exist
 
 Y_kMeans = Y.copy()
@@ -403,7 +421,7 @@ plt.xlim(0, pct99)
 plt.title(f"Filing amounts and total unique lobbyists by k-means cluster\n(Up to 99th percentile filing amounts)")
 plt.show()
 
-# %%
+# # %%
 # Group and visualize outcomes by cluster
 
 clusterGroup = Y_kMeans.groupby('cluster')
@@ -417,14 +435,14 @@ for y in yList:
     plt.title(f"{y} by k-means cluster")
     plt.show()
 
-# %%
+# # %%
 # Visualize cluster 4 categories
 
 X_kMeans = X.copy()
 
 X_kMeans['cluster'] = y_kmeans.tolist()
 
-for cNum in [4,11]:
+for cNum in [15,21]:
 
     X_kMeansFilter = X_kMeans[X_kMeans['cluster'] == cNum].mean().sort_values(ascending = True)
 
@@ -436,4 +454,188 @@ for cNum in [4,11]:
     X_kMeansFilter.plot(kind = 'barh', title = f'Top entity and topic focuses for cluster {cNum}')
     plt.xlim(0, 1)
     plt.show()
+
+'''
+
+# %%
+# Import train-test split
+
+from sklearn.model_selection import train_test_split
+
+# %%
+# Create train-test split
+
+X_train, X_test, y_train, y_test = train_test_split(X, Y['income or expenses'], test_size=0.2)
+
+# %%
+# Imports for SVM
+
+from sklearn.svm import SVR
+
+from sklearn.pipeline import make_pipeline
+
+from sklearn import model_selection
+
+from sklearn import preprocessing
+
+# %%
+# SVM cv grid search and modeling (skipped because the cv portion was taking far too long)
+
+'''
+
+grid = {
+   'C':[0.01,0.1,1,10],
+   'kernel' : ["linear","poly","rbf","sigmoid"],
+   'degree' : [1,3,5,7],
+   'gamma' : [0.01,1]
+}
+
+# # %%
+# Run grid searches for the best SVM parameter combo (from Lecture 12 notes), skipped
+
+
+svr  = SVR ()
+svm_cv = model_selection.GridSearchCV(svr, grid, cv = 5)
+svm_cv.fit(X_train,y_train)
+print("Best Parameters:",svm_cv.best_params_)
+print("Train Score:",svm_cv.best_score_)
+print("Test Score:",svm_cv.score(X_test,y_test))
+
+'''
+
+# %%
+# Imports for gradient boosting
+
+from sklearn.ensemble import GradientBoostingRegressor
+
+# %%
+# Generate a list of learning rates
+
+# Initialize an empty list
+rateList2 = []
+
+# For numbers in the given range:
+for num in range(4,10):
+    # Add that * 0.01, creating the desired list
+    rateList2.append(num*0.01)
+
+# %%
+# Import iteration tools 
+# from itertools import cycle, islice
+
+# %%
+# Generate a list of max depths
+
+depthList2 = range(2,5)
+
+# %%
+# Generate a dictionary of parameters for use in CV grid search
+
+params = {
+    'learning_rate': rateList2,
+    'max_depth': depthList2,
+    # Note: manually tested estimator ranges and this seemed to be centered around the usual optimums
+    'n_estimators': range(14,20)
+}
+
+# %%
+
+# Importing xgboost for modeling work
+import xgboost as xgb
+
+# Importing CV grid search
+from sklearn.model_selection import GridSearchCV
+
+# %%
+# Generating the test model for CV grid search
+
+testModel = xgb.XGBRegressor(random_state = 1)
+
+# %%
+# Looping through fold amounts to perform CV grid search and identify the best modeling parameters
+
+# Initializing empty lists
+cvLR = []
+cvDepth = []
+cvEst = []
+
+# For the given cv fold numbers:
+for cvNum in [5, 7, 10]:
+    # Perform a grid search
+    gridSearchTest = GridSearchCV(
+    testModel,
+    params,
+    cv = cvNum
+    )
+    # Fit the search
+    gridSearchTest.fit(X_train,y_train)
+    # Print the best parameters and append them to their respective lists
+    print(f"Best parameters for cv {cvNum}: {gridSearchTest.best_params_}")
+    cvLR.append(gridSearchTest.best_params_['learning_rate'])
+    cvDepth.append(gridSearchTest.best_params_['max_depth'])
+    cvEst.append(gridSearchTest.best_params_['n_estimators'])
+
+# %%
+# Importing statistics for easy mode calc
+import statistics
+
+# %%
+# Calculate mode values across all cv fold numbers
+
+modeLR = statistics.mode(cvLR)
+
+modeDepth = statistics.mode(cvDepth)
+
+modeEst = statistics.mode(cvEst)
+
+print(f"Mode learning rate: {modeLR}")
+print(f"Mode maximum depth: {modeDepth}")
+print(f"Mode minimum child weight: {modeEst}")
+# %%
+# Test optimized model with mode inputs, different outputs, and test/training splits
+
+# Define optimized model
+model=xgb.XGBRegressor(random_state = 1, learning_rate = modeLR, max_depth = modeDepth, n_estimators = modeEst)
+
+# Initialize empty list of test sizes
+sizeList = []
+
+# Add test sizes from 0.1 to 0.9
+for num in range(1,10,1):
+    sizeList.append(num/10)
+
+print(f"Test sizes in use: {sizeList}")
+
+# Initialize empty list of scores
+scoreList = []
+
+# For each dependent variable:
+for y in yList:
+    # For each listed test size:
+    for size in sizeList:
+        # Redefine the testing/training split
+        X_train, X_test, y_train, y_test = train_test_split(X, Y[y], test_size = size)
+        # Fit the new model
+        model.fit(X_train, y_train)
+        # Score the new model
+        score = model.score(X_test,y_test)
+        # Print the scores and append them to the score list
+        print(f"Score for {y} at test size {size}: {score}")
+        scoreList.append([y, size, score])
+
+
+# %%
+# Define a dataframe of scores by parameter
+
+yScores = pd.DataFrame(scoreList, columns = ['dependentVar', 'size', 'score'])
+
+print(yScores)
+
+# %%
+# Plot scores by test size to determine the optimal setup
+
+plt.figure(figsize = (10,7))
+sns.lineplot(yScores, x = 'size', y = 'score', hue = 'dependentVar')
+plt.title("Scoring distribution by test split size and dependent variable")
+plt.show()
 # %%
