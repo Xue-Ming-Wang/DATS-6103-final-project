@@ -2,8 +2,7 @@
 
 # This file uses the cleaned LDA filing data as an input, iterating through records to create a dataframe with dummy variables for each category.
 
-# %%[markdown]
-### Setting up data
+
 # %%
 # Importing libraries
 
@@ -199,6 +198,14 @@ df = pd.DataFrame(dataList, columns = colNameList)
 
 print(df)
 
+# %%[markdown]
+
+    # ##################################################
+    #                     Q3 start here                #
+    # ##################################################
+
+# %%[markdown]
+# Setting up variables
 # %%
 # Droping two columns
 df = df.drop(columns=['income or expenses', 'internal lobbying'])
@@ -210,81 +217,73 @@ policy_areas= df.drop(columns=['lobbyist_count_new', 'lobbyist_count_all'])
 lobbyist= ['lobbyist_count_new', 'lobbyist_count_all']
 
 # %%[markdown]
-### Apriori algorithm - simple version
+### EDA for Q3
+# %%[markdown]
+### correlation matrix
 # %%
+# Calculate the correlation matrix
+correlation_matrix = policy_areas.corr()
 
-# Implement Apriori algorithm for association rule mining
-from mlxtend.frequent_patterns import apriori, association_rules
+# Display the correlation matrix
+print(correlation_matrix)
 
-# Convert policy areas to binary indicators
-policy_areas_binary = pd.get_dummies(policy_areas)
-
-# Generate frequent itemsets using Apriori algorithm
-frequent_itemsets = apriori(policy_areas, min_support=0.1, use_colnames=True)
-
-# Generate association rules
-rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
-
-# Display the association rules
-print("Association Rules:")
-print(rules)
 
 # %%[markdown]
-### Apriori algorithm - Defense
+### Top/lowest correlation matrix
 # %%
-# Import necessary libraries
-from mlxtend.frequent_patterns import apriori
-from mlxtend.frequent_patterns import association_rules
+## Sort the correlation matrix
+sorted_corr = correlation_matrix.unstack().sort_values(ascending=False)
 
+# Remove correlations of variables with themselves (which will be 1)
+sorted_corr = sorted_corr[sorted_corr != 1]
 
-# Convert policy areas to binary indicators
-policy_areas_binary = df.drop(columns=['lobbyist_count_new', 'lobbyist_count_all'])
+# Print out the 10 highest correlations
+print("Top 10 highest correlations:")
+for i, (indices, correlation) in enumerate(sorted_corr.head(10).items(), 1):
+    index1, index2 = indices
+    print(f"{i}. {index1} - {index2}: {correlation}")
 
-# Apply Apriori algorithm to find frequent itemsets
-frequent_itemsets = apriori(policy_areas_binary, min_support=0.1, use_colnames=True)
+# Print out the 10 lowest correlations
+filtered_corr = sorted_corr[sorted_corr > 0.001].tail(10)
 
-# Generate association rules
-rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.5)
-
-# Filter rules related to the policy area of interest
-policy_area_of_interest = "Defense"
-relevant_rules = rules[rules['antecedents'].apply(lambda x: policy_area_of_interest in x)]
-
-# Display the relevant association rules
-print("Association Rules for Policy Area:", policy_area_of_interest)
-print(relevant_rules)
+# Print out the 10 lowest correlations
+print("\nTop 10 lowest correlations:")
+for i, (indices, correlation) in enumerate(filtered_corr.items(), 1):
+    index1, index2 = indices
+    print(f"{i}. {index1} - {index2}: {correlation}")
 
 # %%
+    
+# Identify the closest associations using correlation matrix
+correlation_matrix = policy_areas.corr()
 
-df.columns.tolist()
+# Sort the correlations
+sorted_corr = correlation_matrix.unstack().sort_values(ascending=False)
+
+# Remove correlations of variables with themselves (which will be 1)
+sorted_corr = sorted_corr[sorted_corr != 1]
+
+# Display the top correlated pairs
+print("Top correlated policy areas:")
+print(sorted_corr.head(10))
+
+
+    
+# %%[markdown]
+### correlation map
+# %%
+# Visualize the correlation matrix using a heatmap
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(12, 10))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Correlation Matrix of Policy Areas')
+plt.show()
+
 
 # %%[markdown]
-### Apriori algorithm within policy area  - complicated version
-# %%
-from mlxtend.frequent_patterns import apriori, association_rules
-
-# Convert policy_areas to binary values (1 if lobbying effort in that policy area, 0 otherwise)
-policy_areas_binary = policy_areas.applymap(lambda x: 1 if x > 0 else 0)
-
-# Find frequent itemsets using the Apriori algorithm
-frequent_itemsets = apriori(policy_areas_binary, min_support=0.1, use_colnames=True)
-
-# Generate association rules
-rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
-
-# Sort the rules by lift (a measure of how much more often the antecedent and consequent occur together than we would expect if they were statistically independent)
-rules = rules.sort_values(by='lift', ascending=False)
-
-# Filter out rules where the antecedent and consequent are the same policy area
-rules = rules[rules['antecedents'] != rules['consequents']]
-
-# Display the resulting association rules
-print("Frequent Itemsets:")
-print(frequent_itemsets)
-print("\nAssociation Rules:")
-print(rules)
-
-# %%[markdown]
+## Modeling
 ### Apriori algorithm - policy area vs lobby efforts
 # %%
 
@@ -314,96 +313,6 @@ print(frequent_itemsets)
 print("\nAssociation Rules:")
 print(rules)
 
-
-# %%[markdown]
-### K-mean Clustering
-# %%
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
-
-# Feature scaling
-scaler = StandardScaler()
-scaled_policy_areas = scaler.fit_transform(policy_areas)
-
-# Initialize KMeans clustering with desired number of clusters
-kmeans = KMeans(n_clusters=5, random_state=42)  
-
-# Fit KMeans to the scaled data
-kmeans.fit(scaled_policy_areas)
-
-# Assign cluster labels to each policy area
-policy_areas['cluster'] = kmeans.labels_
-
-# Analyze the clusters
-cluster_centers = scaler.inverse_transform(kmeans.cluster_centers_)  
-
-# Print cluster centers
-print("Cluster Centers:")
-for i, center in enumerate(cluster_centers):
-    print(f"Cluster {i+1}: {center}")
-
-# Analyze the distribution of policy areas within each cluster
-cluster_distribution = policy_areas.groupby('cluster').mean()
-
-# Print cluster distribution
-print("\nCluster Distribution:")
-print(cluster_distribution)
-
-
-# %%[markdown]
-### K-mean Clustering fewer dataset
-# %%
-# Round the cluster centers to 2 decimal places
-cluster_centers_rounded = [[round(value, 2) for value in center] for center in cluster_centers]
-
-# Print cluster centers
-print("Cluster Centers:")
-for i, center in enumerate(cluster_centers_rounded):
-    print(f"Cluster {i+1}: {center}")
-
-# Filter out columns with low values for easier interpretation
-significant_columns = cluster_distribution.columns[cluster_distribution.max() > 0.5]
-
-# Analyze the distribution of policy areas within each cluster using only significant columns
-cluster_distribution_filtered = cluster_distribution[significant_columns]
-
-# Print cluster distribution with significant columns
-print("\nCluster Distribution:")
-print(cluster_distribution_filtered)
-
-# %%[markdown]
-### K-mean Clustering <0.3
-# %%
-# Round the cluster centers to 2 decimal places
-cluster_centers_rounded = [[round(value, 2) for value in center] for center in cluster_centers]
-
-# Print cluster centers
-print("Cluster Centers:")
-for i, center in enumerate(cluster_centers_rounded):
-    print(f"Cluster {i+1}: {center}")
-
-# Filter out columns with low values for easier interpretation
-significant_columns = cluster_distribution.columns[(cluster_distribution.max() > 0.3) & (cluster_distribution.max() < 1)]
-
-# Analyze the distribution of policy areas within each cluster using only significant columns
-cluster_distribution_filtered = cluster_distribution[significant_columns]
-
-# Print cluster distribution with significant columns
-print("\nCluster Distribution (only significant columns above 0.3):")
-print(cluster_distribution_filtered)
-
-
-
-# %%
-# Plot the cluster distribution
-
-plt.figure(figsize=(10, 6))
-sns.heatmap(cluster_distribution_filtered, annot=True, fmt=".2f", cmap="YlGnBu")
-plt.title('Cluster Distribution of Significant Policy Areas')
-plt.xlabel('Policy Areas')
-plt.ylabel('Cluster')
-plt.xticks(rotation=45, ha='right')
-plt.show()
 
 # %%[markdown]
 ### K-mean Clustering - elbow method
@@ -450,7 +359,7 @@ plt.ylabel('Cluster')
 plt.xticks(rotation=45, ha='right')
 plt.show()
 
-# %%
+
 # %%[markdown]
 ### Train a classification model -Random Forest 
 # %%
