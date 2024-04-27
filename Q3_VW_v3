@@ -25,6 +25,41 @@ import seaborn as sns
 # Importing scikitlearn for modeling and feature selection work
 import sklearn
 
+# %%[markdown]
+
+    # ##################################################
+    #                     Q3 Package                   #
+    # ##################################################
+# %%
+# Importing libraries for Apriori algorithm and association rules
+from mlxtend.frequent_patterns import apriori, association_rules
+
+# Importing libraries for data preprocessing and scaling
+from sklearn.preprocessing import StandardScaler
+
+# Importing libraries for K-means clustering
+from sklearn.cluster import KMeans
+
+# Importing libraries for splitting data into training and testing sets
+from sklearn.model_selection import train_test_split
+
+# Importing libraries for Random Forest classifier
+from sklearn.ensemble import RandomForestClassifier
+
+# Importing libraries for calculating accuracy and generating classification reports
+from sklearn.metrics import accuracy_score, classification_report
+
+# Importing libraries for cross-validation
+from sklearn.model_selection import cross_val_score
+
+# Importing libraries for logistic regression
+from sklearn.linear_model import LogisticRegression
+
+# Importing libraries for decision tree classifier
+from sklearn.tree import DecisionTreeClassifier
+
+# Importing library for creating a pipeline for data preprocessing and model training
+from sklearn.pipeline import make_pipeline
 
 # %%
 # Load data from raw file in repository
@@ -273,9 +308,6 @@ print(sorted_corr.head(10))
 ### correlation map
 # %%
 # Visualize the correlation matrix using a heatmap
-import seaborn as sns
-import matplotlib.pyplot as plt
-
 plt.figure(figsize=(12, 10))
 sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
 plt.title('Correlation Matrix of Policy Areas')
@@ -284,11 +316,9 @@ plt.show()
 
 # %%[markdown]
 ## Modeling
-### Apriori algorithm - policy area vs lobby efforts
+### Apriori algorithm 
+
 # %%
-
-from mlxtend.frequent_patterns import apriori, association_rules
-
 # Convert policy_areas to binary values (1 if lobbying effort in that policy area, 0 otherwise)
 policy_areas_binary = policy_areas.applymap(lambda x: 1 if x > 0 else 0)
 
@@ -298,28 +328,43 @@ frequent_itemsets = apriori(policy_areas_binary, min_support=0.1, use_colnames=T
 # Generate association rules
 rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
 
-# Sort the rules by lift 
-rules = rules.sort_values(by='lift', ascending=False)
+# Filter out rules where the antecedent and consequent are complementary pairs of each other
+filtered_rules = []
 
-# Filter out rules where the antecedent and consequent are the same policy area
-rules = rules[rules['antecedents'] != rules['consequents']]
+for index, rule in rules.iterrows():
+    antecedents = set(rule['antecedents'])
+    consequents = set(rule['consequents'])
+    
+    if (antecedents, consequents) not in filtered_rules and (consequents, antecedents) not in filtered_rules:
+        filtered_rules.append((antecedents, consequents))
 
-# Rename the consequents column to 'lobbyist_count_new' and 'lobbyist_count_all'
-rules['consequents'] = rules['consequents'].apply(lambda x: frozenset({'lobbyist_count_new', 'lobbyist_count_all'}) - x)
+# Sort rules based on lift values
+sorted_rules = rules.sort_values(by='lift', ascending=False)
 
-# Display the resulting association rules
+# Print the top three rules after filtering
+print("Top Three Filtered Association Rules:")
+count = 0
+for antecedents, consequents in filtered_rules:
+    rule = sorted_rules[(sorted_rules['antecedents'] == antecedents) & (sorted_rules['consequents'] == consequents)].iloc[0]
+    count += 1
+    print(f"Rule {count}:")
+    print(f"Antecedents: {antecedents}, Consequents: {consequents}")
+    print(f"Support: {rule['support'] * 100:.2f}%, Confidence: {rule['confidence'] * 100:.2f}%, Lift: {rule['lift']}")
+    if count == 3:
+        break
+
+
+# %%
+# Display all resulting association rules
 print("Frequent Itemsets:")
 print(frequent_itemsets)
 print("\nAssociation Rules:")
 print(rules)
 
-
-# %%[markdown]
-### K-mean Clustering - elbow method
 # %%
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
+#  K-mean Clustering - elbow method)
 
+'''
 # Scale the data
 scaler = StandardScaler()
 scaled_data = scaler.fit_transform(policy_areas)
@@ -337,7 +382,7 @@ plt.title('Elbow Method')
 plt.xlabel('Number of Clusters')
 plt.ylabel('WCSS')
 plt.show()
-# %%
+
 # Apply K-means clustering with optimal number of clusters
 optimal_clusters = 17  
 kmeans = KMeans(n_clusters=optimal_clusters, init='k-means++', random_state=42)
@@ -359,19 +404,17 @@ plt.ylabel('Cluster')
 plt.xticks(rotation=45, ha='right')
 plt.show()
 
+'''
+
 
 # %%[markdown]
 ### Train a classification model -Random Forest 
 # %%
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report
-
 X = policy_areas.values  # Input features
 
 # Perform K-means clustering with 17 clusters
-kmeans = KMeans(n_clusters=17, random_state=42)
-cluster_assignments = kmeans.fit_predict(X)
+# kmeans = KMeans(n_clusters=17, random_state=42)
+# cluster_assignments = kmeans.fit_predict(X)
 
 y = df['lobbyist_count_new']  # Target variable
 
@@ -421,8 +464,6 @@ plt.gca().invert_yaxis()
 plt.show()
 
 # %%
-import matplotlib.pyplot as plt
-from sklearn.model_selection import cross_val_score
 
 # Initialize the Random Forest classifier
 rf_classifier = RandomForestClassifier()
@@ -444,15 +485,11 @@ plt.xticks(range(1, len(cv_scores) + 1))
 plt.axhline(y=cv_scores.mean(), color='r', linestyle='--', label='Mean CV Score')
 plt.legend()
 plt.show()
-# %%[markdown]
-### Train a classification model - logistic regression
 
 # %%
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report
+#  Train a classification model - logistic regression
 
+'''
 # Split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -477,22 +514,47 @@ print(f"Accuracy: {accuracy}")
 # Evaluate the model
 print("Classification Report:")
 print(classification_report(y_test, y_pred))
-# %%
-import matplotlib.pyplot as plt
-from sklearn.model_selection import cross_val_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
+
+# Fit the logistic regression model on the scaled training data
+logistic_reg.fit(X_train_scaled, y_train)
+
+# Extract coefficients from the logistic regression model
+coefficients = logistic_reg.coef_[0]
+
+# Create a dictionary mapping feature names to their coefficients
+coefficients_dict = dict(zip(policy_areas.columns, coefficients))
+
+# Sort the coefficients in descending order of absolute magnitude
+sorted_coefficients = sorted(coefficients_dict.items(), key=lambda x: abs(x[1]), reverse=True)
+
+# Print the top 20 feature coefficients
+print("\nTop 20 Feature Coefficients:")
+for feature, coefficient in sorted_coefficients[:20]:
+    print(f"{feature}: {coefficient}")
+
+# Extract top 20 feature names and coefficients
+top_features = [val[0] for val in sorted_coefficients[:20]]
+top_coefficients = [val[1] for val in sorted_coefficients[:20]]
+
+# Plot the coefficients
+plt.figure(figsize=(10, 8))
+plt.barh(range(len(top_features)), top_coefficients, align='center')
+plt.yticks(range(len(top_features)), top_features)
+plt.xlabel('Coefficient Value')
+plt.title('Top 20 Feature Coefficients - Logistic Regression')
+plt.gca().invert_yaxis() 
+plt.show()
 
 # Create a pipeline with scaling and logistic regression
 pipeline = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
 
 # Perform cross-validation
-cv_scores = cross_val_score(pipeline, X, y, cv=5)  # You can adjust the number of folds (cv) as needed
+cv_scores = cross_val_score(pipeline, X, y, cv=5)  
 
 # Print cross-validation scores
 print("Cross-Validation Scores:", cv_scores)
 print("Mean CV Score:", cv_scores.mean())
-# %%
+
 # Plot the cross-validation scores
 plt.figure(figsize=(8, 6))
 plt.bar(range(1, len(cv_scores) + 1), cv_scores, color='lightgreen')
@@ -503,15 +565,11 @@ plt.xticks(range(1, len(cv_scores) + 1))
 plt.axhline(y=cv_scores.mean(), color='r', linestyle='--', label='Mean CV Score')
 plt.legend()
 plt.show()
-
-# %%[markdown]
-### Train a classification model - decision tree
-
+'''
 # %%
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score, classification_report
+# Train a classification model - decision tree
+
+'''
 
 # Split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -533,7 +591,7 @@ print(f"Accuracy: {accuracy}")
 print("Classification Report:")
 print(classification_report(y_test, y_pred))
 
-# %%
+
 # Extract feature importances from the trained Decision Tree classifier
 dt_feature_importances = decision_tree.feature_importances_
 dt_feature_importance_dict = dict(zip(policy_areas.columns, dt_feature_importances))
@@ -547,9 +605,7 @@ plt.title('Top 10 Feature Importances - Decision Tree')
 plt.gca().invert_yaxis()
 plt.show()
 
-# %%
-import matplotlib.pyplot as plt
-from sklearn.model_selection import cross_val_score
+
 
 # Initialize the Decision Tree classifier
 decision_tree = DecisionTreeClassifier()
@@ -571,5 +627,7 @@ plt.xticks(range(1, len(cv_scores) + 1))
 plt.axhline(y=cv_scores.mean(), color='r', linestyle='--', label='Mean CV Score')
 plt.legend()
 plt.show()
+
+'''
 
 # %%
