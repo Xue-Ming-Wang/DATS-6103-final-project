@@ -282,11 +282,9 @@ print(df)
 df.describe()
 
 # %%[markdown]
+# ***
+### Initial Data Processing for Questions 1-2
 
-# %% [markdown]
-
-## Question 1
-### How do lobbying efforts differ between policy areas in 2023?
 
 # %%
 ### Drop filings that have no income/expenses
@@ -326,6 +324,13 @@ print(X)
 
 xCols = X.columns
 
+
+# %% [markdown]
+
+# ***
+## Question 1
+### How do lobbying efforts differ between policy areas in 2023?
+
 # %%
 
 ### Elbow method for kmeans:
@@ -346,8 +351,6 @@ plt.show()
 ### Print cluster differences and select an outcome
 for i in range(1, len(wcss)):
     print(f"{i-1} to {i}: {wcss[i] - wcss[i-1]}")
-
-print('The "elbow" seems to be vaguely present at 2 across multiple runs')
 
 
 # %%
@@ -374,7 +377,6 @@ plt.show()
 # %%
 ##### Setting chosen cluster number as well as a random seed so that results stay consistent across runs
 nChosen = 50
-import numpy as np
 
 np.random.seed(77)
 
@@ -410,49 +412,16 @@ clusterAvg = clusterGroup.mean()
 clusterAvg = clusterAvg.reset_index()
 
 for y in yList:
+    plt.figure(figsize = (12,7))
     sns.barplot(data = clusterAvg, x = 'cluster', y = y, palette = 'pastel')
     plt.title(f"{y} by k-means cluster")
     plt.show()
 
+# %%[markdown]
 
 # ***
 ## Question 2
 ### What is the relationship between lobbying focus (in total contributions, total lobbyists hired, etc.) and activity/entity focus?
-
-# %%[markdown]
-
-### Initial Filtering
-
-# %%
-# Drop filings that have no income/expenses
-
-df = df[df['income or expenses'] != 0]
-
-# %%
-# Define a list of variables for outcomes to use throughout the script
-
-yList = ['income or expenses', 'lobbyist_count_all', 'lobbyist_count_new']
-
-
-# %%
-# Drop columns with very low  or near-ubiquitous incidence rates
-
-for col in df.columns.tolist():
-    zeroRows = len(df[df[col]==0])
-    zeroPct = zeroRows/len(df)
-    if (zeroPct > 0.99 or zeroPct < 0.01) and col not in yList:
-        df.drop(columns=col, inplace = True)
-        print(f"Dropping {col}; occurrence %: {1 - (zeroRows/len(df)):.2f}")
-    else:
-        print(f"Keeping {col}; occurrence %: {1 - (zeroRows/len(df)):.2f}")
-
-
-print(df)
-
-# %%
-# Drop internal lobbying due to focus on policy areas
-df = df.drop(columns = ['internal lobbying'])
-
 
 # %%[markdown]
 
@@ -495,16 +464,6 @@ sns.heatmap(corrMatrix, ax = None)
 plt.title("Correlation matrix for all features", fontsize = 40)
 plt.show()
 
- # %%
-# Split the dataset into X and Y
-
-Y = df.loc[:, yList]
-X = df.drop(columns = yList)
-
-print(Y)
-print(X)
-
-xCols = X.columns
 
 
 # %%
@@ -603,7 +562,7 @@ X.drop(columns = dropList, inplace = True)
 # K-means clustering
 #
 
-# Plot elbow for k-means clustering
+# Plot elbow for k-means clustering with the reduced feature set
 
 # Note: Lecture 10 notes; using 'auto' for n_init since the best parameters for this high-dimensional dataset aren't immediately obvious
 
@@ -621,12 +580,12 @@ plt.show()
 
 
 # %%
-# Print cluster differences and select an outcome
+# Print cluster differences
 for i in range(1, len(wcss)):
     print(f"{i-1} to {i}: {wcss[i] - wcss[i-1]}")
 
 
-print("There is no clear drop-off in utility from added clusters")
+print("There is no clear drop-off in utility from added clusters, similarly to Q1; this modeling approach is likely insufficient")
 
 
 # %%
