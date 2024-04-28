@@ -357,14 +357,14 @@ print('The "elbow" seems to be vaguely present at 2 across multiple runs')
 
 silhouette_scores = []
 
-for k in range(2, 11):
+for k in range(2, 50):
     kmeans = KMeans(n_clusters=k)
     kmeans.fit(X)
     labels = kmeans.predict(X)
     silhouette_avg = silhouette_score(X, labels)
     silhouette_scores.append(silhouette_avg)
 
-plt.plot(range(2, 11), silhouette_scores)
+plt.plot(range(2, 50), silhouette_scores)
 plt.xlabel('Number of Clusters')
 plt.ylabel('Silhouette Score')
 plt.title('Silhouette Method: Optimal Number of Clusters')
@@ -373,7 +373,7 @@ plt.show()
 
 # %%
 ##### Setting chosen cluster number as well as a random seed so that results stay consistent across runs
-nChosen = 2
+nChosen = 50
 import numpy as np
 
 np.random.seed(77)
